@@ -16,7 +16,7 @@ class TranscriptionConfig(BaseModel):
     top_k: Optional[int] = Field(default=None, ge=1, description="Top-k sampling parameter")
     
     # Processing parameters
-    device: Device = Field(default="cpu", description="Device for processing")
+    device: Optional[Device] = Field(default=None, description="Device for processing (auto-detect if None)")
     batch_size: int = Field(default=1, ge=1, description="Batch size for processing")
     max_length: Optional[int] = Field(default=None, ge=1, description="Maximum transcription length")
     

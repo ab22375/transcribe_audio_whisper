@@ -19,7 +19,18 @@ class WhisperTranscriber:
         try:
             device = self._get_device()
             logger.info(f"Loading Whisper model '{self.config.model}' on {device}")
-            self.model = whisper.load_model(self.config.model, device=device)
+            
+            # Load model with appropriate precision
+            if device == "cpu":
+                # Use FP32 for CPU to avoid warning
+                self.model = whisper.load_model(self.config.model, device=device)
+                # Ensure model uses FP32
+                if hasattr(self.model, 'half'):
+                    self.model = self.model.float()
+            else:
+                # GPU/MPS can use FP16
+                self.model = whisper.load_model(self.config.model, device=device)
+                
         except Exception as e:
             logger.error(f"Failed to load Whisper model: {e}")
             raise
@@ -30,8 +41,17 @@ class WhisperTranscriber:
             return "cuda"
         elif self.config.device == "mps" and torch.backends.mps.is_available():
             return "mps"
-        else:
+        elif self.config.device == "cpu":
             return "cpu"
+        else:
+            # Auto-detect best device if not explicitly set
+            if torch.backends.mps.is_available():
+                logger.info("Apple Silicon detected, using MPS acceleration")
+                return "mps"
+            elif torch.cuda.is_available():
+                return "cuda"
+            else:
+                return "cpu"
     
     def transcribe_file(self, audio_path: Path) -> Dict[str, Any]:
         """Transcribe a single audio file."""
@@ -78,6 +98,11 @@ class WhisperTranscriber:
         
         if self.config.temperature != 0.0:
             options['temperature'] = self.config.temperature
+        
+        # Force FP32 on CPU to avoid warning
+        device = self._get_device()
+        if device == "cpu":
+            options['fp16'] = False
         
         # Add other sampling parameters if they differ from defaults
         decode_options = {}
